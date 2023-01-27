@@ -1,0 +1,7 @@
+sqlalchemy[async]
+aiomysql
+fastapi
+uvicorn
+python-multipart
+aiofiles
+aiosqlite
