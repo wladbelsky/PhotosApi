@@ -2,5 +2,4 @@ __pycache__
 venv
 .idea
 .vscode
-static/images/*
 db.sqlite3
