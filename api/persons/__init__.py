@@ -1,0 +1,1 @@
+from .router import router as persons_router

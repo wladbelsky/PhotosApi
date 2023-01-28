@@ -1,1 +1,1 @@
-from .resource import router as photos_router
+from .router import router as photos_router

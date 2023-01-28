@@ -51,7 +51,7 @@ async def check_token(token: str = Depends(oauth2_scheme)):
     raise HTTPException(status_code=401, detail="Invalid token")
 
 
-@router.post("/register")
+@router.post("/register", status_code=201)
 async def register(user: UserLogin):
     db: Database = await Database()
     username = user.username

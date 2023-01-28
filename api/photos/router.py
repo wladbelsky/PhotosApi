@@ -2,14 +2,14 @@ from fastapi import APIRouter, File, UploadFile, Body, Depends, HTTPException
 from .schemas import Photo, PhotoResponse, GeoLocation, Person, PhotoFilters
 from database import Database
 from .utils import save_file
-from .models import Person as PersonModel, Photo as PhotoModel
-from sqlalchemy.orm import selectinload
+from .models import Photo as PhotoModel
+from api.persons.models import Person as PersonModel
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import select
 from config import server_address
-from api.auth.resource import check_token
+from api.auth.router import check_token
 from api.auth.schemas import User
 from datetime import datetime
-from typing import Optional
 
 
 router = APIRouter(
@@ -21,6 +21,7 @@ def create_photo_response(photo: PhotoModel):
     return PhotoResponse(
         id=photo.id,
         name=photo.name,
+        date=photo.date,
         description=photo.description,
         geolocation=GeoLocation(lat=photo.latitude, lng=photo.longitude),
         persons=[Person(id=person.id, name=person.name) for person in photo.persons],
@@ -32,26 +33,21 @@ def create_photo_response(photo: PhotoModel):
 @router.get("/", response_model=list[PhotoResponse])
 async def get_photos(user: User = Depends(check_token), filters: PhotoFilters = Depends()):
     db: Database = await Database()
-    models = (PhotoModel, PersonModel)
-
-    def parse_filters(filter: dict, table: str = 'photos'):
-        sql_filters = []
-        model = next(models, lambda m: m.__tablename__ == table, None)
-        if not model:
-            return []
-        for key, val in filter.dict().items():
-            if val is not None:
-                sql_filters.append(getattr(model, key) == val)
-        return sql_filters
-
+    sql_filters = []
+    filters_dict = filters.dict()
+    if person_name := filters_dict.pop('person_name', None):
+        sql_filters.append(PersonModel.name == person_name)
+    for key, value in filters_dict.items():
+        if value is not None:
+            sql_filters.append(getattr(PhotoModel, key) == value)
     async with db.get_session() as session:
         result = await session.execute(
             select(PhotoModel)\
                 .where(
                     PhotoModel.user_id == user.id,
-                    *parse_filters(filters.dict()) if filters else [])\
-                .options(selectinload(PhotoModel.persons)))
-        photos: list[PhotoModel] = result.scalars().all()
+                    *sql_filters)\
+                .options(joinedload(PhotoModel.persons)))
+        photos: list[PhotoModel] = result.unique().scalars().all()
         return list(map(create_photo_response, photos))
 
 
@@ -59,14 +55,16 @@ async def get_photos(user: User = Depends(check_token), filters: PhotoFilters = 
 async def get_photo(photo_id: int, user: User = Depends(check_token)):
     db: Database = await Database()
     async with db.get_session() as session:
-        result = await session.execute(select(PhotoModel).where(PhotoModel.id == photo_id))
+        result = await session.execute(select(PhotoModel)\
+                                        .where(PhotoModel.id == photo_id)\
+                                        .options(joinedload(PhotoModel.persons)))
         photo: PhotoModel = result.scalars().first()
         if user.id != photo.user_id:
             raise HTTPException(status_code=403, detail="Forbidden")
         return create_photo_response(photo)
 
 
-@router.post("/", response_model=PhotoResponse)
+@router.post("/", response_model=PhotoResponse, status_code=201)
 async def post_photos(data: Photo = Body(...), file: UploadFile = File(...), user: User = Depends(check_token)):
     db: Database = await Database()
     file_name = await save_file(file)
@@ -74,7 +72,7 @@ async def post_photos(data: Photo = Body(...), file: UploadFile = File(...), use
     async with db.get_session() as session:
         photo: PhotoModel = PhotoModel(
             name=data.name,
-            datetime=datetime.now(),
+            date=datetime.now().date(),
             user_id=user.id,
             description=data.description,
             filename=file_name,
