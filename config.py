@@ -8,3 +8,5 @@ db_config = {
         }
 
 file_save_path = './static/images/'
+server_address = 'http://localhost:8000'
+jwt_secret = 'secret'
