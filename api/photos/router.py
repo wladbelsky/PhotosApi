@@ -30,7 +30,10 @@ def create_photo_response(photo: PhotoModel):
     )
 
 
-@router.get("/", response_model=list[PhotoResponse])
+@router.get("/", response_model=list[PhotoResponse], 
+            description="Get photos list, filtres are optional. "
+            "Returns only photos of current user"
+            )
 async def get_photos(user: User = Depends(check_token), filters: PhotoFilters = Depends()):
     db: Database = await Database()
     sql_filters = []
@@ -43,6 +46,7 @@ async def get_photos(user: User = Depends(check_token), filters: PhotoFilters = 
     async with db.get_session() as session:
         result = await session.execute(
             select(PhotoModel)\
+                .join(PersonModel)\
                 .where(
                     PhotoModel.user_id == user.id,
                     *sql_filters)\
@@ -51,7 +55,11 @@ async def get_photos(user: User = Depends(check_token), filters: PhotoFilters = 
         return list(map(create_photo_response, photos))
 
 
-@router.get("/{photo_id}", response_model=PhotoResponse)
+@router.get("/{photo_id}", response_model=PhotoResponse, 
+            description="Get photo by id. "
+            "Returns only photos of current user. "
+            "Response contains image url"
+            )
 async def get_photo(photo_id: int, user: User = Depends(check_token)):
     db: Database = await Database()
     async with db.get_session() as session:
@@ -64,7 +72,7 @@ async def get_photo(photo_id: int, user: User = Depends(check_token)):
         return create_photo_response(photo)
 
 
-@router.post("/", response_model=PhotoResponse, status_code=201)
+@router.post("/", response_model=PhotoResponse, status_code=201, description="Create new photo")
 async def post_photos(data: Photo = Body(...), file: UploadFile = File(...), user: User = Depends(check_token)):
     db: Database = await Database()
     file_name = await save_file(file)

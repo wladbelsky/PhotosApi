@@ -9,7 +9,7 @@ router = APIRouter(
     prefix="/persons",
 )
 
-@router.get("/autocomplete", response_model=list[str])
+@router.get("/autocomplete", response_model=list[str], description="Get persons names by prefix")
 async def get_persons_autocomplete(person_name: str):
     db: Database = await Database()
     async with db.get_session() as session:

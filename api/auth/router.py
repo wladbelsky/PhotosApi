@@ -51,7 +51,7 @@ async def check_token(token: str = Depends(oauth2_scheme)):
     raise HTTPException(status_code=401, detail="Invalid token")
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, description="Register new user")
 async def register(user: UserLogin):
     db: Database = await Database()
     username = user.username
@@ -66,7 +66,7 @@ async def register(user: UserLogin):
         return {"message": "User created"}
 
 
-@router.post("/token")
+@router.post("/token", description="Get authentification token")
 async def get_token(form_data: OAuth2PasswordRequestForm = Depends()):
     username = form_data.username
     password = form_data.password
